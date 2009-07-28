@@ -1,0 +1,12 @@
+DONE - Add an environment variable which controls the output log file name
+DONE - Add printing stack facility
+DONE - Add an environment variable which controls whether to print or not the stack
+DONE - Make it working for C code
+DONE - Decide what to do with libpthread.so - should be looked for by the ldd output
+DONE - write a script which wrappers the LD_PRELOAD and the actual call
+- write an analysis script
+- Add headers with a license
+DONE - Add README file
+DONE - Add Changelog file
+- Check indirect linking with libpthread.so
+- Think of better stack printing

@@ -1,0 +1,29 @@
+mi
+--
+
+pthread Mutex Instrumentation
+
+Environment variables:
+MI_LIBPTHREAD - path to the system pthread library. If the variable is not set
+                then mi will look for the path to the library using ldd on the
+                given program to be analysed
+MI_LOGFILE    - path to the log file where the collected information is stored
+MI_OPTIONS    - accepted values:
+                stack - accompany each operation with a stack trace (slow)
+
+There are 3 steps:
+1. Set the required environment variables. You may not set any. In this case
+   the default log file will be mi.log, libpthread.so will be searched in
+   the list of dinamically linked libraries of the given binary and the stack
+   trace will no be collected.
+2. Run your application via the provided script:
+   ./mi yourProgram
+   Type:
+   ./mi --help
+   for a usage message
+3. As soon as the application finished run another script:
+   ./miAnalyser
+   Type:
+   ./miAnalyser --help
+   for a usage message
+
