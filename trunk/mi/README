@@ -21,9 +21,12 @@ There are 3 steps:
    Type:
    ./mi --help
    for a usage message
+   You also have an option to set the described environment variables manually
+   as well as LD_PRELOAD=<path to libpthread.so> and run your application
+   directly.
 3. As soon as the application finished run another script:
-   ./miAnalyser
+   ./statmi
    Type:
-   ./miAnalyser --help
+   ./statmi --help
    for a usage message
 
