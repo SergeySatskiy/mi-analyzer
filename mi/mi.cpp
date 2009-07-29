@@ -1,3 +1,18 @@
+//
+// File:   mi.cpp
+//
+// Author: Sergey Satskiy, copyright (c) 2009
+//
+// Date:   July 22, 2009
+//
+// $Id$
+//
+// Permission to copy, use, modify, sell and distribute this software
+// is granted provided this copyright notice appears in all copies.
+// This software is provided "as is" without express or implied
+// warranty, and with no claim as to its suitability for any purpose.
+//
+
 
 #include <dlfcn.h>
 #include <stdio.h>
@@ -30,15 +45,18 @@ pthread_mutex_t     inLock = PTHREAD_MUTEX_INITIALIZER;
 class PthreadWrapper
 {
     private:
-        void *              handle;
-        FILE *              outputFile;
-        mutex_function      lockFunction;
-        mutex_function      unlockFunction;
-        mutex_function      trylockFunction;
-        bool                putStackTrace;
-        vector<pthread_t>   inProcess;
+        void *              handle;             // libpthread.so handle
+        FILE *              outputFile;         // log file
+        mutex_function      lockFunction;       // pthread_mutex_lock()
+        mutex_function      unlockFunction;     // pthread_mutex_unlock()
+        mutex_function      trylockFunction;    // pthread_mutex_trylock()
+        bool                putStackTrace;      // log the stack trace?
+        vector<pthread_t>   inProcess;          // The backtrace() locks a
+                                                // mutex internally so keep a
+                                                // track of what is processed
 
     public:
+        // Checks if the process is in pthread_mutex_XXXlock() call
         bool  isProcessed( void ) const
         {
             bool found;
@@ -49,6 +67,7 @@ class PthreadWrapper
             return found;
         }
 
+        // Registers the process which is in pthread_mutex_XXXlock() call
         void  registerThread( void )
         {
             this->lockFunction( &inLock );
@@ -56,11 +75,13 @@ class PthreadWrapper
             this->unlockFunction( &inLock );
         }
 
+        // Unregisters the process from the pthread_mutex_XXXlock() call
         void  unregisterThread( void )
         {
             this->lockFunction( &inLock );
             vector<pthread_t>::iterator     candidate( find( inProcess.begin(),
-                                                             inProcess.end(), pthread_self() ) );
+                                                             inProcess.end(),
+                                                             pthread_self() ) );
             if ( candidate != inProcess.end() ) inProcess.erase( candidate );
             this->unlockFunction( &inLock );
         }
@@ -80,43 +101,56 @@ class PthreadWrapper
 
             if ( !handle )
             {
-                fprintf( stderr, "Cannot get libpthread.so handle. dlopen: %s\n", dlerror() );
+                fprintf( stderr,
+                         "Cannot get libpthread.so handle. dlopen: %s\n",
+                         dlerror() );
                 exit( 1 );
             }
 
             dlerror();
-            lockFunction = (mutex_function)dlsym( handle, "pthread_mutex_lock" );
+            lockFunction = (mutex_function)dlsym( handle,
+                                                  "pthread_mutex_lock" );
             err = dlerror();
             if ( err )
             {
                 fclose( outputFile );
                 dlclose( handle );
-                fprintf( stderr, "Cannot get pthread_mutex_lock() pointer. dlsym: %s\n", err );
+                fprintf( stderr,
+                         "Cannot get pthread_mutex_lock() pointer. dlsym: %s\n",
+                         err );
                 exit( 1 );
             }
 
-            unlockFunction = (mutex_function)dlsym( handle, "pthread_mutex_unlock" );
+            unlockFunction = (mutex_function)dlsym( handle,
+                                                    "pthread_mutex_unlock" );
             err = dlerror();
             if ( err )
             {
                 fclose( outputFile );
                 dlclose( handle );
-                fprintf( stderr, "Cannot get pthread_mutex_unlock() pointer. dlsym: %s\n", err );
+                fprintf( stderr,
+                         "Cannot get pthread_mutex_unlock() pointer. dlsym: %s\n",
+                         err );
                 exit( 1 );
             }
 
-            trylockFunction = (mutex_function)dlsym( handle, "pthread_mutex_trylock" );
+            trylockFunction = (mutex_function)dlsym( handle,
+                                                     "pthread_mutex_trylock" );
             err = dlerror();
             if ( err )
             {
                 fclose( outputFile );
                 dlclose( handle );
-                fprintf( stderr, "Cannot get pthread_mutex_trylock() pointer. dlsym: %s\n", err );
+                fprintf( stderr,
+                         "Cannot get pthread_mutex_trylock() pointer. dlsym: %s\n",
+                         err );
                 exit( 1 );
             }
 
-            if ( logfilePath == 0 ) outputFile = fopen( defaultLogfile, "w" );
-            else                    outputFile = fopen( logfilePath, "w" );
+            if ( logfilePath == 0 || strlen( logfilePath ) == 0 )
+                outputFile = fopen( defaultLogfile, "w" );
+            else
+                outputFile = fopen( logfilePath, "w" );
             if ( !outputFile )
             {
                 dlclose( handle );
@@ -124,11 +158,17 @@ class PthreadWrapper
                 exit( 1 );
             }
 
-            if ( logfilePath == 0 ) this->write( "Env: log file: %s\n", defaultLogfile );
-            else                    this->write( "Env: log file: %s\n", logfilePath );
+            if ( logfilePath == 0 )
+                this->write( "Env: log file: %s\n", defaultLogfile );
+            else
+                this->write( "Env: log file: %s\n", logfilePath );
 
-            if ( libpthreadPath == 0 ) this->write( "Env: libpthread.so path: %s\n", defaultLibpthreadPath );
-            else                       this->write( "Env: libpthread.so path: %s\n", libpthreadPath );
+            if ( libpthreadPath == 0 )
+                this->write( "Env: libpthread.so path: %s\n",
+                             defaultLibpthreadPath );
+            else
+                this->write( "Env: libpthread.so path: %s\n",
+                             libpthreadPath );
 
             if ( options != 0 && strlen( options ) != 0 )
             {
@@ -138,14 +178,18 @@ class PthreadWrapper
                 }
                 else
                 {
-                    fprintf( stderr, "Unsupported option '%s' in the MI_OPTIONS "
-                                     "environment variable. Supported values: 'stack'.", options );
+                    fprintf( stderr,
+                             "Unsupported option '%s' in the MI_OPTIONS "
+                             "environment variable. Supported values: 'stack'.",
+                             options );
                     exit( 1 );
                 }
             }
 
-            if ( putStackTrace ) this->write( "Env: print stack trace\n" );
-            else                 this->write( "Env: do not print stack trace\n" );
+            if ( putStackTrace )
+                this->write( "Env: print stack trace\n" );
+            else
+                this->write( "Env: do not print stack trace\n" );
         }
 
         ~PthreadWrapper()
@@ -177,6 +221,7 @@ class PthreadWrapper
             void *      addrlist[1024];
 
             // retrieve current stack addresses
+            // locks a mutex internally!
             int         addrlen = backtrace( addrlist, 1024 );
             if ( addrlen == 0 )
             {
@@ -257,6 +302,10 @@ class PthreadWrapper
 };
 
 
+// Basically it could be that it took more than a few cycles of
+// the clock_t clocks. I however don't bother of that as soon as
+// this kind of things usually means really bad design or designed
+// on purpose
 const clock_t     maxClock( ~0x0 );
 clock_t  clockDiff( clock_t  start, clock_t  end )
 {
@@ -270,6 +319,8 @@ static PthreadWrapper   pw;
 
 extern "C"
 {
+    // Instrumented functions
+
     int pthread_mutex_lock( pthread_mutex_t *  m )
     {
         if ( pw.isProcessed() )
