@@ -94,11 +94,56 @@ def statmiMain():
         print "Execution environment:"
         for item in environment:
             print "    " + item.string
+
+    if len( operations ) == 0:
+        print "No mutex operations detected"
+        return 0
+
     print "Collected " + str( len(operations) ) + " operations."
-    for item in operations:
-        item.printOp()
+    #for item in operations:
+    #    item.printOp()
+
+    mutexLegend = {}
+    threadLegend = {}
+    chains = {}
+    mostConsumingOps = {}
+
+    print "Collecting chains and statistics..."
+    collectChains( operations, chains,
+                   mutexLegend, threadLegend, mostConsumingOps )
+    print "Number of threads: " + str( len(threadLegend) )
+    print "Number of mutexes: " + str( len(mutexLegend) )
+
     analyse( operations, verbose )
     return 0
+
+
+def collectChains( operations, chains,
+                   mutexLegend, threadLegend, mostConsumingOps ):
+    """ Collects statistics and operations chains """
+
+    currentChains = {}
+    for op in operations:
+        mutexShortName = getMutexName( mutexLegend, op.object )
+        threadShortName = getThreadName( threadLegend, op.thread )
+
+
+def getMutexName( legend, id ):
+    """ returns an existed or a newly created short mutex name """
+    if legend.has_key( id ):
+        return legend[ id ]
+    name = "m" + str( len( legend ) )
+    legend[ id ] = name
+    return name
+
+
+def getThreadName( legend, id ):
+    """ returns an existed or a newly created short thread name """
+    if legend.has_key( id ):
+        return legend[ id ]
+    name = "t" + str( len( legend ) )
+    legend[ id ] = name
+    return name
 
 
 def analyse( operations, verbose ):
