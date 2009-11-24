@@ -7,4 +7,4 @@ love:
 	g++ -Wall -g -O0 -otest-bad-3 test/test-bad-3.cpp -lpthread
 
 clean:
-	rm -rf *.so test-lib-ok mi.log
+	rm -rf *.so test-lib-ok mi.log test-bad-*
