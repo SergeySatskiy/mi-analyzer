@@ -10,3 +10,6 @@ DONE - Add README file
 DONE - Add Changelog file
 - Check indirect linking with libpthread.so
 - Think of better stack printing
+- Test cases: proper order in .so library
+              improper order in elf (2 mutexes)
+              improper order in elf (many mutexes)

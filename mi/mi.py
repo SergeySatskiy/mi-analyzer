@@ -171,7 +171,8 @@ def findLibpthread( elfPath ):
         if parts[0].strip().startswith( "libpthread.so" ):
             return parts[2].strip()
 
-        if parts[0].strip().startswith( "linux-gate.so" ):
+        if parts[0].strip().startswith( "linux-gate.so" ) or \
+           parts[0].strip().startswith( "linux-vdso.so" ):
             continue
 
         if parts[0].strip().startswith( "statically" ):
@@ -203,6 +204,14 @@ mi is a mutex instrumenting package. It provides the following:
   detection of [potential] dead locks
 - statistics of success and failures
 - time spent on mutex lock operations
+
+mi can be controlled by the following environment variables:
+MI_LIBPTHREAD - path to the system pthread library. If the variable is not set
+                then mi will look for the path to the library using ldd on the
+                given program to be analysed
+MI_LOGFILE    - path to the log file where the collected information is stored
+MI_OPTIONS    - accepted values:
+                stack - accompany each operation with a stack trace (slow)
 
 Usage:
 mi [me option keys] [--] <program to analyse> [program option keys]
