@@ -1,5 +1,5 @@
 //
-// File:   test.cpp
+// File:   test-bad-2.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //
@@ -15,17 +15,20 @@
 
 #include <pthread.h>
 
+#include <iostream>
+using namespace std;
 
-int f( void )
+int main( void )
 {
+    cout << "Test (bad) m1.lock -> m2.lock -> m1.unlock -> m2.unlock" << endl;
+
     pthread_mutex_t     m1 = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t     m2 = PTHREAD_MUTEX_INITIALIZER;
 
     pthread_mutex_lock( &m1 );
     pthread_mutex_lock( &m2 );
-
-    pthread_mutex_unlock( &m2 );
     pthread_mutex_unlock( &m1 );
+    pthread_mutex_unlock( &m2 );
 
     return 0;
 }
