@@ -1,5 +1,5 @@
 //
-// File:   test-lib-ok.cpp.cpp
+// File:   test.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //
@@ -13,15 +13,20 @@
 // warranty, and with no claim as to its suitability for any purpose.
 //
 
-#include <iostream>
-using namespace std;
+#include <pthread.h>
 
 
-int f( void );
-
-int main( int argc, char ** argv )
+int f( void )
 {
-    cout << "Test (good - locks are in a shared library" << endl;
-    return f();
+    pthread_mutex_t     m1 = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t     m2 = PTHREAD_MUTEX_INITIALIZER;
+
+    pthread_mutex_lock( &m1 );
+    pthread_mutex_lock( &m2 );
+
+    pthread_mutex_unlock( &m2 );
+    pthread_mutex_unlock( &m1 );
+
+    return 0;
 }
 
