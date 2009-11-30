@@ -1,5 +1,5 @@
 //
-// File:   test-lib-bad.cpp
+// File:   test-lib-fun-bad.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //

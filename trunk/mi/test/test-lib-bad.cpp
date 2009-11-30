@@ -1,5 +1,5 @@
 //
-// File:   test-lib-ok.cpp.cpp
+// File:   test-lib-bad.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //
@@ -21,7 +21,7 @@ int f( void );
 
 int main( int argc, char ** argv )
 {
-    cout << "Test (good - locks are in a shared library)" << endl;
+    cout << "Test (bad - locks are in a shared library)" << endl;
     return f();
 }
 

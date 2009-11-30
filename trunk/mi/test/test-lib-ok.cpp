@@ -1,5 +1,5 @@
 //
-// File:   test-lib-ok.cpp.cpp
+// File:   test-lib-ok.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //

@@ -1,5 +1,5 @@
 //
-// File:   test.cpp
+// File:   test-lib-fun-ok.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //
