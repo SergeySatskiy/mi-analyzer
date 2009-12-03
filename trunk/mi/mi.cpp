@@ -33,12 +33,12 @@ using namespace std;
 typedef int (*mutex_function)( pthread_mutex_t * );
 
 
-const char *    defaultLibpthreadPath = "/lib/libpthread.so.0";
-const char *    defaultLogfile = "mi.log";
+static const char *    defaultLibpthreadPath = "/lib/libpthread.so.0";
+static const char *    defaultLogfile = "mi.log";
 
 
-pthread_mutex_t     outputLock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t     inLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t     outputLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t     inLock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -307,7 +307,7 @@ class PthreadWrapper
 // this kind of things usually means really bad design or designed
 // on purpose
 const clock_t     maxClock( ~0x0 );
-clock_t  clockDiff( clock_t  start, clock_t  end )
+static clock_t  clockDiff( clock_t  start, clock_t  end )
 {
     if ( end >= start ) return end - start;
     return (maxClock - start) + end;    // Overrun
@@ -333,7 +333,7 @@ extern "C"
         clock_t     after( clock() );
 
         pw.getLockFunction()( &outputLock );
-        pw.write( "Op: lock Object: 0x%p Thread: %lu RetCode: %d Clocks: %lu\n",
+        pw.write( "Op: lock Object: %p Thread: %lu RetCode: %d Clocks: %lu\n",
                   m, pthread_self(), retVal, clockDiff( before, after ) );
         pw.saveStack();
         pw.getUnlockFunction()( &outputLock );
@@ -353,7 +353,7 @@ extern "C"
         clock_t     after( clock() );
 
         pw.getLockFunction()( &outputLock );
-        pw.write( "Op: unlock Object: 0x%p Thread: %lu RetCode: %d Clocks: %lu\n",
+        pw.write( "Op: unlock Object: %p Thread: %lu RetCode: %d Clocks: %lu\n",
                   m, pthread_self(), retVal, clockDiff( before, after ) );
         pw.saveStack();
         pw.getUnlockFunction()( &outputLock );
@@ -373,7 +373,7 @@ extern "C"
         clock_t     after( clock() );
 
         pw.getLockFunction()( &outputLock );
-        pw.write( "Op: trylock Object: 0x%p Thread: %lu RetCode: %d Clocks: %lu\n",
+        pw.write( "Op: trylock Object: %p Thread: %lu RetCode: %d Clocks: %lu\n",
                   m, pthread_self(), retVal, clockDiff( before, after ) );
         pw.saveStack();
         pw.getUnlockFunction()( &outputLock );
