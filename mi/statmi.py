@@ -24,6 +24,7 @@ from optparse import OptionParser
 from mi       import getExceptionInfo
 
 __version__ = "0.0.1"
+__author__  = "Sergey Satskiy <sergey.satskiy@gmail.com>"
 
 
 class Env:
@@ -31,30 +32,52 @@ class Env:
 
     def __init__( self, string ):
         self.string = string
+    def __str__( self ):
+        return self.string
 
 class Op:
     """ Single operation """
 
     def __init__( self, op, obj, th, ret, cl ):
-        self.operation = op
-        self.object    = obj
-        self.thread    = th
-        self.ret       = ret
-        self.clocks    = cl
-        self.bt        = []
+        self.operation   = op
+        self.object      = obj
+        self.thread      = th
+        self.ret         = ret
+        self.clocks      = int(cl)
+        self.backtrace   = []
+        self.shortObj    = ""
+        self.shortThread = ""
 
     def addBt( self, line ):
         """ Adds a back trace line """
-        self.bt.append( line )
+        self.backtrace.append( line )
 
-    def printOp( self ):
-        """ prints the operation """
-        print "Operation: " + self.operation + " Object: " + self.object + \
-              " Thread: " + self.thread + " Return code: " + self.ret +    \
-              " Clocks: " + self.clocks
-        print "Backtrace:"
-        for item in self.bt:
-            print "    " + item
+    def __str__( self ):
+        retVal = "Operation: " + self.operation + " Object: " + self.object
+        if self.shortObj != "":
+            retVal += "(" + self.shortObj + ")"
+
+        retVal += " Thread: " + self.thread
+        if self.shortThread != "":
+            retVal += "(" + self.shortThread + ")"
+
+        retVal += " Return code: " + self.ret + " Clocks: " + str(self.clocks)
+        if len( self.backtrace ) == 0:
+            return retVal
+
+        return retVal + "\nBacktrace:\n    " + "\n    ".join( self.backtrace )
+
+    def __repr__( self ):
+        return self.__str__()
+
+    def __eq__( self, other ):
+        return self.operation == other.operation and \
+               self.object    == other.object and \
+               self.thread    == other.thread and \
+               self.backtrace == other.backtrace
+
+    def __ne__( self, other ):
+        return not self.__eq__( other )
 
 
 def statmiMain():
@@ -64,11 +87,18 @@ def statmiMain():
     """
     %prog [options] [fileName]
     Statistics collection in a log file produced by mi
+    Return code: 0 - no problems identified
+                 1 - there are warnings
+                 2 - there are errors
     """ )
 
     parser.add_option( "-v", "--verbose",
                        action="store_true", dest="verbose", default=False,
                        help="be verbose (default: False)" )
+    parser.add_option( "-f", "--print-failed",
+                       action="store_true", dest="printFailed", default=False,
+                       help="print available information about failed " \
+                            "operations (default: False)" )
 
     options, args = parser.parse_args()
     if not len( args ) in [ 0, 1 ]:
@@ -77,6 +107,7 @@ def statmiMain():
         return 1
 
     verbose = options.verbose
+    printFailed = options.printFailed
 
     logFileName = os.environ.get( 'MI_LOGFILE', 'mi.log' )
     if len( args ) == 1:
@@ -86,10 +117,14 @@ def statmiMain():
         print "Cannot find log file '" + logFileName + "'"
         return 1
 
-    environment = []
-    operations = []
+    environment      = []
+    operations       = []
+    failedOperations = []
+    mutexLegend      = {}   # 0xZZZZZZZZZZZ -> mZZZ
+    threadLegend     = {}   # ULZZZZZZZZZZZ -> tZZZ
 
-    parseLogFile( logFileName, environment, operations, verbose )
+    parseLogFile( logFileName, environment, operations, failedOperations,
+                  mutexLegend, threadLegend )
     if len( environment ) > 0:
         print "Execution environment:"
         for item in environment:
@@ -99,59 +134,287 @@ def statmiMain():
         print "No mutex operations detected"
         return 0
 
-    print "Collected " + str( len(operations) ) + " operations."
-    #for item in operations:
-    #    item.printOp()
-
-    mutexLegend = {}
-    threadLegend = {}
-    chains = {}
-    mostConsumingOps = {}
-
-    print "Collecting chains and statistics..."
-    collectChains( operations, chains,
-                   mutexLegend, threadLegend, mostConsumingOps )
     print "Number of threads: " + str( len(threadLegend) )
     print "Number of mutexes: " + str( len(mutexLegend) )
+    print "Successfull operations: " + str( len(operations) )
+    print "Failed operations: " + str( len(failedOperations) )
 
-    analyse( operations, verbose )
+    if printFailed and len(failedOperations) > 0:
+        for item in failedOperations:
+            print "Failed: " + item
+
+    if verbose:
+        print "Collected operations:"
+        for item in operations:
+            print item
+
+    chains = {}                 # tZZZ -> [ [opx, opy, opz], [opx, opz], ... ]
+    mostConsumingOps = []
+
+    print "Collecting chains and statistics..."
+    collectChains( operations, chains, mostConsumingOps, threadLegend )
+
+    if verbose:
+        print "Collected chains:"
+        print chains
+
+    if len( operations ) == 0:
+        print "The program has not locked any mutexes. No analysis required."
+        return 0
+
+    print "Threads legend:"
+    for key in threadLegend.keys():
+        print threadLegend[ key ] + " -> " + key
+    print "Mutexes legend:"
+    for key in mutexLegend.keys():
+        print mutexLegend[ key ] + " -> " + key
+
+    analyse( chains, verbose )
     return 0
 
 
-def collectChains( operations, chains,
-                   mutexLegend, threadLegend, mostConsumingOps ):
+def collectChains( operations, chains, mostConsumingOps, threadLegend ):
     """ Collects statistics and operations chains """
 
+    # Initialise the initial chains
     currentChains = {}
+    for key, value in threadLegend.iteritems():
+        currentChains[ value ] = [ False, [] ]      # False - should not be
+                                                    # added to the chains list
+
+    # process all the operation. The failed operations were excluded
+    # at the stage of the reading log file
     for op in operations:
-        mutexShortName = getMutexName( mutexLegend, op.object )
-        threadShortName = getThreadName( threadLegend, op.thread )
+
+        if op.operation == "lock" or op.operation == "trylock":
+            # add the operation and mark as should be added to the chains list
+            currentChains[ op.shortThread ][ 0 ] = True
+            currentChains[ op.shortThread ][ 1 ].append( op )
+            continue
+
+        if op.operation == "unlock":
+            lockedMutexIndex = getMutexIndexInChain( op,
+                                   currentChains[ op.shortThread ][ 1 ] )
+            if lockedMutexIndex == -1:
+                printUnlockingNonLockedError( op,
+                                              currentChains[op.shortThread][1] )
+                continue
+
+            if lockedMutexIndex != len(currentChains[op.shortThread][1]) - 1:
+                printUnlockingOrderWarning( op,
+                                            currentChains[op.shortThread][1] )
+
+            # Register the chain if required
+            if currentChains[ op.shortThread ][ 0 ] == True and \
+               len(currentChains[op.shortThread][1]) > 1:
+                # Chains of length == 1 are not interesting
+                addChain( chains, currentChains[op.shortThread][1] )
+
+            # Delete the operation from the current chain
+            del( currentChains[ op.shortThread ][ 1 ][ lockedMutexIndex ] )
+
+            # Reset the chain flag
+            currentChains[ op.shortThread ][ 0 ] = False
+            continue
+
+        print >> sys.stderr, "WARNING: Unknown operation:\n " + \
+                             str(op) + "\nSkipping."
+
+    # Post analysis: there should not be still locked mutexes
+    for key, value in currentChains.iteritems():
+        if len( value[ 1 ] ) > 0:
+            printLeftUnlockedError( value[ 1 ] )
+    return
 
 
-def getMutexName( legend, id ):
+def printUnlockingNonLockedError( unlockOperation, lockChain ):
+    """ Prints the error message that a non-locked mutex is unlocked """
+
+    print >> sys.stderr, "----------------------------\n" \
+             "ERROR: Unlocking mutex which is not previously locked.\n" + \
+             str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
+    if len( lockChain ) == 0:
+        print >> sys.stderr, "None"
+    else:
+        for operation in lockChain:
+            print >> sys.stderr, operation
+    print >> sys.stderr, "----------------------------"
+    return
+
+
+def printUnlockingOrderWarning( unlockOperation, lockChain ):
+    """ Prints the warning message that not the last mutex unlocked """
+
+    print >> sys.stderr, "----------------------------\n" \
+             "WARNING: Unlocking not the last locked mutex in the thread\n" + \
+             str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
+    for operation in lockChain:
+        print >> sys.stderr, operation
+    print >> sys.stderr, "----------------------------"
+    return
+
+
+def printLeftUnlockedError( chain ):
+    """ Prints the error message that some mutexes are left unlocked """
+
+    print >> sys.stderr, "----------------------------\n" \
+             "ERROR: Some mutex[es] left locked in the thread:"
+    for operation in chain:
+        print >> sys.stderr, operation
+    print >> sys.stderr, "----------------------------"
+    return
+
+
+
+def addChain( chains, chain ):
+    """ Adds a chain to the collected chains if required """
+
+    shortThread = chain[0].shortThread
+    if not chains.has_key( shortThread ):
+        chains[ shortThread ] = []
+
+    # check if there is the same or longer chain
+    for index in range( 0, len( chains[ shortThread ] ) ):
+        compareResult = compareChains( chain, chains[ shortThread ][ index ] )
+        if compareResult == 0:
+            # Matched or shorter
+            return
+        if compareResult == 1:
+            # Should replace the existed
+            chains[ shortThread ][ index ] = chain
+            return
+
+    # No such a chain - add it
+    chains[ shortThread ].append( list(chain) )
+    return
+
+
+def compareChains( inputChain, existedChain ):
+    """ Return value: -1 inputChain differs to the existedChain
+                       0 inputChain is the same or shorter than existedChain
+                      +1 inputChain covers existed and is longer """
+
+    minLength = min( len(inputChain), len(existedChain) )
+    for index in range( 0, minLength ):
+        if inputChain[index] != existedChain[index]:
+            return -1
+
+    # Here: the common length part of the chains matches
+
+    if len(inputChain) <= len(existedChain):
+        return 0
+
+    # Here: input chain is longer and the common part matches
+
+    return 1
+
+
+def getMutexIndexInChain( operation, chain ):
+    """ Searches for the locked mutex in the given chain.
+        Returns: -1 if not found """
+
+    for index in range( 0, len( chain ) ):
+        if operation.shortObj == chain[ index ].shortObj:
+            return index
+    return -1
+
+
+def getMutexName( legend, mutexID ):
     """ returns an existed or a newly created short mutex name """
-    if legend.has_key( id ):
-        return legend[ id ]
+    if legend.has_key( mutexID ):
+        return legend[ mutexID ]
     name = "m" + str( len( legend ) )
-    legend[ id ] = name
+    legend[ mutexID ] = name
     return name
 
 
-def getThreadName( legend, id ):
+def getThreadName( legend, threadID ):
     """ returns an existed or a newly created short thread name """
-    if legend.has_key( id ):
-        return legend[ id ]
+    if legend.has_key( threadID ):
+        return legend[ threadID ]
     name = "t" + str( len( legend ) )
-    legend[ id ] = name
+    legend[ threadID ] = name
     return name
 
 
 def analyse( operations, verbose ):
     """ analyses the collected operations """
 
+    threads = operations.keys()
+    for firstThreadIndex in range( 0, len( threads ) - 1 ):
+        for secondThreadIndex in range( firstThreadIndex + 1, len( threads ) ):
+            if verbose:
+                print "Checking threads " + threads[firstThreadIndex] + \
+                      " and " + threads[secondThreadIndex] + "..."
+            checkLockChains( operations[ threads[firstThreadIndex] ],
+                             operations[ threads[secondThreadIndex] ] )
     return
 
-def parseLogFile( logFileName, environment, operations, verbose ):
+def checkLockChains( firstThreadChains, secondThreadChains ):
+    """ check two threads chains"""
+
+    for firstThreadChain in firstThreadChains:
+        for secondThreadChain in secondThreadChains:
+            checkLockOrder( firstThreadChain, secondThreadChain )
+    return
+
+
+def buildLockPairs( chain ):
+    """ builds a list of mutex lock pairs """
+
+    lockPairs = []
+    for firstIndex in range( 0, len(chain) - 1 ):
+        for secondIndex in range( firstIndex + 1, len(chain) ):
+            lockPairs.append( [ chain[firstIndex], chain[secondIndex] ] )
+    return lockPairs
+
+
+def printWrongLockOrderError( firstChain, secondChain,
+                              firstPair, secondPair ):
+    """ Prints error message that two threads lock
+        mutexes in opposite order """
+
+    firstThread = firstChain[0].shortThread
+    secondThread = secondChain[0].shortThread
+
+    print >> sys.stderr, "----------------------------\n" \
+             "ERROR: potential dead lock detected\n" \
+             "Thread " + firstThread + " lock stack:"
+    for operation in firstChain:
+        print >> sys.stderr, operation
+    print >> sys.stderr, "Thread " + secondThread + " lock stack:"
+    for operation in secondChain:
+        print >> sys.stderr, operation
+    print >> sys.stderr, "Thread " + firstThread + " detected pair:\n" + \
+             str(firstPair[0]) + "\n" + str(firstPair[1]) + "\n" + \
+             "Thread " + secondThread + " detected pair:\n" + \
+             str(secondPair[0]) + "\n" + str(secondPair[1]) + "\n" + \
+             "----------------------------"
+    return
+
+
+
+def checkLockOrder( firstChain, secondChain ):
+    """ Checks of there are any conflicts in mutex locking order """
+    firstLockPairs = buildLockPairs( firstChain )
+    secondLockPairs = buildLockPairs( secondChain )
+
+    for firstPair in firstLockPairs:
+        for secondPair in secondLockPairs:
+            if isLockPairOpposite( firstPair, secondPair ):
+                printWrongLockOrderError( firstChain, secondChain,
+                                          firstPair, secondPair )
+    return
+
+
+def isLockPairOpposite( first, second ):
+    """ Checks if the pairs lock mutexes in opposite order """
+    return first[0].shortObj == second[1].shortObj and \
+           first[1].shortObj == second[0].shortObj
+
+
+def parseLogFile( logFileName, environment, operations, failedOperations,
+                  mutexLegend, threadLegend ):
     """ reads and parses log file """
 
     f = open( logFileName )
@@ -178,7 +441,14 @@ def parseLogFile( logFileName, environment, operations, verbose ):
                     break
                 op.addBt( line.replace( "Bt: ", "" ).strip() )
                 line = f.readline()
-            operations.append( op )
+
+            op.shortObj = getMutexName( mutexLegend, op.object )
+            op.shortThread = getThreadName( threadLegend, op.thread )
+            # Check the operation return code
+            if int(op.ret) == 0:
+                operations.append( op )
+            else:
+                failedOperations.append( op )
             continue
         print "Warning: unrecognised log file line: '" + line + "'. Ignoring."
         line = f.readline()

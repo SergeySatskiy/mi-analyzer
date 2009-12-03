@@ -13,3 +13,10 @@ DONE - Add Changelog file
 - Test cases: proper order in .so library
               improper order in elf (2 mutexes)
               improper order in elf (many mutexes)
+- Add mi command line arguments to control log file name and backtrace printing
+- Test case: unlocking a not locked mutex
+- statmi return code: non-zero if there are warnings or mistakes
+- Test case: left locked mutexes
+- Test case: time consuming operations
+- Test case: failed operations
+
