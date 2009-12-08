@@ -24,6 +24,7 @@ from traceback import format_tb
 from subprocess import Popen, PIPE
 
 __version__ = "0.0.1"
+__author__ = "Sergey Satskiy <sergey.satskiy@gmail.com>"
 
 
 
@@ -36,10 +37,14 @@ def miMain():
 
     verbose = False
 
+    logFilePath = ""
+    libpthreadPath = ""
+    libmiPath = ""
+
     index = 1
     while index < len( sys.argv ):
         if sys.argv[ index ] == "--":
-            index = index + 1
+            index += 1
             break
         if not sys.argv[ index ].startswith( "-" ):
             break
@@ -48,31 +53,63 @@ def miMain():
             return 0
         if sys.argv[ index ] in [ "-v", "--verbose" ]:
             verbose = True
-            index = index + 1
+            index += 1
             continue
-        print "Not recognised option key: " + sys.argv[ index ]
-        print "Abort. Type: " + sys.argv[0] + " --help for usage."
+        if sys.argv[ index ] in [ "-l", "--logfile" ]:
+            index += 1
+            if index >= len( sys.argv ):
+                print >> sys.stderr, "Wrong arguments. Type: " + \
+                         sys.argv[0] + " --help for usage."
+                return 1
+            logFilePath = sys.argv[ index ]
+            index += 1
+            continue
+        if sys.argv[ index ] in [ "-p", "--pthread" ]:
+            index += 1
+            if index >= len( sys.argv ):
+                print >> sys.stderr, "Wrong arguments. Type: " + \
+                         sys.argv[0] + " --help for usage."
+                return 1
+            libpthreadPath = sys.argv[ index ]
+            index += 1
+            continue
+        if sys.argv[ index ] in [ "-m", "--libmi" ]:
+            index += 1
+            if index >= len( sys.argv ):
+                print >> sys.stderr, "Wrong arguments. Type: " + \
+                         sys.argv[0] + " --help for usage."
+                return 1
+            libmiPath = sys.argv[ index ]
+            index += 1
+            continue
+
+        print >> sys.stderr, "Not recognised option key: " + sys.argv[ index ]
+        print >> sys.stderr, "Abort. Type: " + sys.argv[0] + \
+                             " --help for usage."
         return 1
 
     # Check that there is still a name of the executable to start
     if index >= len( sys.argv ):
-        print "Program to analyse is not specified."
-        print "Abort. Type: " + sys.argv[0] + " --help for usage."
+        print >> sys.stderr, "Program to analyse is not specified."
+        print >> sys.stderr, "Abort. Type: " + sys.argv[0] + \
+                             " --help for usage."
         return 1
 
     # Check the substitution library path
     if verbose:
         print "Looking for the libmi.so..."
 
-    base = os.path.abspath( sys.argv[0] )
-    while os.path.islink( base ):
-        base = os.path.abspath( base + os.readlink( base ) )
-    base = os.path.dirname( base )
+    if libmiPath == "":
+        base = os.path.abspath( sys.argv[0] )
+        while os.path.islink( base ):
+            base = os.path.abspath( base + os.readlink( base ) )
+        base = os.path.dirname( base )
 
-    libmiPath = base + "/libmi.so"
+        libmiPath = base + "/libmi.so"
+
     if not os.path.exists( libmiPath ):
-        print "libmi.so is not found. It must be located at " + \
-              libmiPath + ". Abort."
+        print >> sys.stderr, "libmi.so is not found. Expected here: " + \
+                             libmiPath + ". Abort."
         return 2
     if verbose:
         print "Found at " + libmiPath
@@ -83,7 +120,8 @@ def miMain():
 
     elfPath = os.path.abspath( sys.argv[ index ] )
     if not os.path.exists( elfPath ):
-        print "The program " + sys.argv[ index ] + " is not found. Abort."
+        print >> sys.stderr, "The program " + sys.argv[ index ] + \
+                             " is not found. Abort."
         return 2
 
     if verbose:
@@ -91,32 +129,44 @@ def miMain():
     index = index + 1   # points to the first program argument if so
 
     # Check for the log file name
-    logFilePath = os.environ.get( 'MI_LOGFILE', '' )
     if logFilePath == "":
-        logFilePath = os.getcwd() + "/mi.log"
+        logFilePath = os.environ.get( 'MI_LOGFILE', '' )
+        if logFilePath == "":
+            logFilePath = os.getcwd() + "/mi.log"
 
     # Check the libpthread
-    libpthreadPath = os.environ.get( 'MI_LIBPTHREAD', '' )
-    if libpthreadPath != "":
-        if not os.path.exists( libpthreadPath ):
-            print "The MI_LIBPTHREAD variable is set to " + libpthreadPath + \
-                  " however this file is not found. Abort."
-            return 2
-        if verbose:
-            print "The MI_LIBPTHREAD variable is set. " \
-                  "Use it as path to libpthread.so"
+    if libpthreadPath == "":
+        libpthreadPath = os.environ.get( 'MI_LIBPTHREAD', '' )
+        if libpthreadPath != "":
+            if not os.path.exists( libpthreadPath ):
+                print >> sys.stderr, "The MI_LIBPTHREAD variable is set to " + \
+                         libpthreadPath + \
+                         " however this file is not found. Abort."
+                return 2
+            if verbose:
+                print "The MI_LIBPTHREAD variable is set. " \
+                      "Using its value as path to libpthread.so"
+        else:
+            # The variable is not set i.e. the libpthread.so path 
+            # must be guessed by the ldd output
+            if verbose:
+                print "The MI_LIBPTHREAD is not set. Search for it in the " \
+                      "given program dynamically linked libraries..."
+            libpthreadPath = getLibpthreadPath( elfPath, verbose )
+            if libpthreadPath == "":
+                print >> sys.stderr, "The " + elfPath + \
+                         " is not linked with libpthread. Abort."
+                return 2
+            if verbose:
+                print "Found at " + libpthreadPath
     else:
-        # The variable is not set i.e. the libpthread.so path must be guessed
-        # by the ldd output
-        if verbose:
-            print "The MI_LIBPTHREAD is not set. Search for it in the given " \
-                  "program dynamically linked libraries..."
-        libpthreadPath = getLibpthreadPath( elfPath, verbose )
-        if libpthreadPath == "":
-            print "The " + elfPath + " is not linked with libpthread. Abort."
+        if not os.path.exists( libpthreadPath ):
+            print >> sys.stderr, "The specified in the --pthread key path " \
+                     "to the libptherad.so (" + libpthreadPath + \
+                     ") does not exist. Abort."
             return 2
         if verbose:
-            print "Found at " + libpthreadPath
+            print "Use the user provided libpthread.so at " + libpthreadPath
 
 
     # Form the executable command line
@@ -216,10 +266,15 @@ MI_OPTIONS    - accepted values:
 Usage:
 mi [me option keys] [--] <program to analyse> [program option keys]
 mi option keys:
---help, -h      prints this message
---verbose, -v   be verbose
---              explicitly separates mi option keys from the program
-                to be analysed
+--help, -h            prints this message
+--verbose, -v         be verbose
+--logfile, -l <path>  path to the log file (overwrites MI_LOGFILE)
+--pthread, -p <path>  path the libpthread.so (overwrites MI_LIBPTHREAD)
+--option,  -o <val>   at the moment the only accepted value is 'stack'
+                      (overwrites MI_OPTIONS)
+--libmi,   -m <path>  path to libmi.so. Default: the same as this script.
+--                    explicitly separates mi option keys from the program
+                      to be analysed
           """
     return
 

@@ -19,4 +19,5 @@ DONE - Add Changelog file
 - Test case: left locked mutexes
 - Test case: time consuming operations
 - Test case: failed operations
-
+- Test case: recursive mutexes
+- Make sure that the error output goes into stderr

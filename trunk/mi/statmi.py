@@ -114,7 +114,7 @@ def statmiMain():
         logFileName = args[0]
 
     if not os.path.exists( logFileName ):
-        print "Cannot find log file '" + logFileName + "'"
+        print >> sys.stderr, "Cannot find log file '" + logFileName + "'"
         return 1
 
     environment      = []
@@ -450,7 +450,8 @@ def parseLogFile( logFileName, environment, operations, failedOperations,
             else:
                 failedOperations.append( op )
             continue
-        print "Warning: unrecognised log file line: '" + line + "'. Ignoring."
+        print >> sys.stderr, "Warning: unrecognised log file line: '" + \
+                             line + "'. Ignoring."
         line = f.readline()
         continue
     f.close()
