@@ -27,6 +27,10 @@ __version__ = "0.0.1"
 __author__  = "Sergey Satskiy <sergey.satskiy@gmail.com>"
 
 
+warningsCount = 0
+errorsCount = 0
+
+
 class Env:
     """ Env: statements from the log file """
 
@@ -34,6 +38,8 @@ class Env:
         self.string = string
     def __str__( self ):
         return self.string
+    def __repr__( self ):
+        return self.__str__()
 
 class Op:
     """ Single operation """
@@ -80,6 +86,35 @@ class Op:
         return not self.__eq__( other )
 
 
+class MostConsumingOperations:
+    """ Holds information about the most consuming operations """
+
+    def __init__( self, lim ):
+        self.limit = lim
+        self.operations = []
+
+    def addOperation( self, oper ):
+        """ Adds a single operation to the list if required """
+
+        if oper.clocks == 0:
+            return
+
+        if len( self.operations ) == self.limit:
+            if oper.clocks < self.operations[ self.limit - 1 ]:
+                return
+
+        for index in range( 0, len( self.operations ) ):
+            if oper.clocks > self.operations[index].clocks:
+                self.operations.insert( index, oper )
+                if len( self.operations ) > self.limit:
+                    self.operations = self.operations[ :-1 ]
+                return
+        if len( self.operations ) < self.limit:
+            self.operations.append( oper )
+        return
+
+
+
 def statmiMain():
     """ The ststmi driver """
 
@@ -90,6 +125,7 @@ def statmiMain():
     Return code: 0 - no problems identified
                  1 - there are warnings
                  2 - there are errors
+                 >= 3 - errors in the script
     """ )
 
     parser.add_option( "-v", "--verbose",
@@ -99,12 +135,20 @@ def statmiMain():
                        action="store_true", dest="printFailed", default=False,
                        help="print available information about failed " \
                             "operations (default: False)" )
+    parser.add_option( "-u", "--ignore-unknown",
+                       action="store_true", dest="ignoreUnknown",
+                       default=False,
+                       help="ignore unknown operations in the mi log file " \
+                            "(default: False)" )
+    parser.add_option( "-l", "--tco-limit", dest="tcoLimit", default=10,
+                       type="int", help="Number of the most time consuming " \
+                                   "operations to be memorised (default: 10)" )
 
     options, args = parser.parse_args()
     if not len( args ) in [ 0, 1 ]:
         sys.stdout = sys.stderr
         parser.print_help()
-        return 1
+        return 3
 
     verbose = options.verbose
     printFailed = options.printFailed
@@ -115,7 +159,7 @@ def statmiMain():
 
     if not os.path.exists( logFileName ):
         print >> sys.stderr, "Cannot find log file '" + logFileName + "'"
-        return 1
+        return 3
 
     environment      = []
     operations       = []
@@ -123,7 +167,10 @@ def statmiMain():
     mutexLegend      = {}   # 0xZZZZZZZZZZZ -> mZZZ
     threadLegend     = {}   # ULZZZZZZZZZZZ -> tZZZ
 
-    parseLogFile( logFileName, environment, operations, failedOperations,
+    mostConsumingOps = MostConsumingOperations( options.tcoLimit )
+
+    parseLogFile( logFileName,
+                  environment, operations, failedOperations, mostConsumingOps,
                   mutexLegend, threadLegend )
     if len( environment ) > 0:
         print "Execution environment:"
@@ -143,16 +190,22 @@ def statmiMain():
         for item in failedOperations:
             print "Failed: " + item
 
+    if len( mostConsumingOps.operations ) > 0:
+        print "The most time consuming operations:"
+        for item in mostConsumingOps.operations:
+            print item
+
+
     if verbose:
         print "Collected operations:"
         for item in operations:
             print item
 
     chains = {}                 # tZZZ -> [ [opx, opy, opz], [opx, opz], ... ]
-    mostConsumingOps = []
 
     print "Collecting chains and statistics..."
-    collectChains( operations, chains, mostConsumingOps, threadLegend )
+    collectChains( operations, chains, threadLegend,
+                   options.ignoreUnknown )
 
     if verbose:
         print "Collected chains:"
@@ -173,7 +226,7 @@ def statmiMain():
     return 0
 
 
-def collectChains( operations, chains, mostConsumingOps, threadLegend ):
+def collectChains( operations, chains, threadLegend, ignoreUnknown ):
     """ Collects statistics and operations chains """
 
     # Initialise the initial chains
@@ -217,8 +270,11 @@ def collectChains( operations, chains, mostConsumingOps, threadLegend ):
             currentChains[ op.shortThread ][ 0 ] = False
             continue
 
-        print >> sys.stderr, "WARNING: Unknown operation:\n " + \
-                             str(op) + "\nSkipping."
+        if ignoreUnknown:
+            print >> sys.stderr, "WARNING: Unknown operation:\n " + \
+                                 str(op) + "\nSkipping."
+        else:
+            raise Exception( "Unknown operation " + str(op) )
 
     # Post analysis: there should not be still locked mutexes
     for key, value in currentChains.iteritems():
@@ -230,6 +286,9 @@ def collectChains( operations, chains, mostConsumingOps, threadLegend ):
 def printUnlockingNonLockedError( unlockOperation, lockChain ):
     """ Prints the error message that a non-locked mutex is unlocked """
 
+    global  errorsCount
+
+    errorsCount += 1
     print >> sys.stderr, "----------------------------\n" \
              "ERROR: Unlocking mutex which is not previously locked.\n" + \
              str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
@@ -245,6 +304,9 @@ def printUnlockingNonLockedError( unlockOperation, lockChain ):
 def printUnlockingOrderWarning( unlockOperation, lockChain ):
     """ Prints the warning message that not the last mutex unlocked """
 
+    global warningsCount
+
+    warningsCount += 1
     print >> sys.stderr, "----------------------------\n" \
              "WARNING: Unlocking not the last locked mutex in the thread\n" + \
              str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
@@ -257,6 +319,9 @@ def printUnlockingOrderWarning( unlockOperation, lockChain ):
 def printLeftUnlockedError( chain ):
     """ Prints the error message that some mutexes are left unlocked """
 
+    global errorsCount
+
+    errorsCount += 1
     print >> sys.stderr, "----------------------------\n" \
              "ERROR: Some mutex[es] left locked in the thread:"
     for operation in chain:
@@ -374,6 +439,9 @@ def printWrongLockOrderError( firstChain, secondChain,
     """ Prints error message that two threads lock
         mutexes in opposite order """
 
+    global errorsCount
+    errorsCount += 1
+
     firstThread = firstChain[0].shortThread
     secondThread = secondChain[0].shortThread
 
@@ -409,11 +477,16 @@ def checkLockOrder( firstChain, secondChain ):
 
 def isLockPairOpposite( first, second ):
     """ Checks if the pairs lock mutexes in opposite order """
+
+    # It considers the case when a chain is a recursive mutex lock
     return first[0].shortObj == second[1].shortObj and \
-           first[1].shortObj == second[0].shortObj
+           first[1].shortObj == second[0].shortObj and \
+           first[0].shortObj != first[1].shortObj and \
+           second[0].shortObj != second[1].shortObj
 
 
-def parseLogFile( logFileName, environment, operations, failedOperations,
+def parseLogFile( logFileName,
+                  environment, operations, failedOperations, mostConsumingOps,
                   mutexLegend, threadLegend ):
     """ reads and parses log file """
 
@@ -444,18 +517,21 @@ def parseLogFile( logFileName, environment, operations, failedOperations,
 
             op.shortObj = getMutexName( mutexLegend, op.object )
             op.shortThread = getThreadName( threadLegend, op.thread )
+
+            # Memorise the operation time if needed
+            if op.clocks > 0:
+                mostConsumingOps.addOperation( op )
+
             # Check the operation return code
             if int(op.ret) == 0:
                 operations.append( op )
             else:
                 failedOperations.append( op )
             continue
-        print >> sys.stderr, "Warning: unrecognised log file line: '" + \
-                             line + "'. Ignoring."
-        line = f.readline()
-        continue
-    f.close()
 
+        raise Exception( "Unrecognised log file line: '" + line + "'." )
+
+    f.close()
     return
 
 
@@ -465,12 +541,17 @@ if __name__ == "__main__":
     returnCode = 0
     try:
         returnCode = statmiMain()
+        if returnCode == 0:
+            if errorsCount > 0:
+                returnCode = 2
+            elif warningsCount > 0:
+                returnCode = 1
     except:
         message = getExceptionInfo()
         if message.startswith( "Exception is cought. 0" ):
             returnCode = 0
         else:
             print >> sys.stderr, message
-            returnCode = 107
+            returnCode = 3
     sys.exit( returnCode )
 
