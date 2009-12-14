@@ -1,6 +1,7 @@
 Prerequisites:
 - python 2.5.2 or 2.6 (http://www.python.org)
-- ldd must be available via PATH
+- if you do not set MI_LIBPTHREAD variable manually then ldd must be available
+  via PATH and the application given to mi must be an ELF file
 
 mi does not require any special installation. Just copy all the mi files
 to the location you want to keep them. You might want to adjust the PATH
