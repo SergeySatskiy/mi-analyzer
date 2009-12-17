@@ -40,6 +40,7 @@ def miMain():
     logFilePath = ""
     libpthreadPath = ""
     libmiPath = ""
+    options = ""
 
     index = 1
     while index < len( sys.argv ):
@@ -80,6 +81,15 @@ def miMain():
                          sys.argv[0] + " --help for usage."
                 return 1
             libmiPath = sys.argv[ index ]
+            index += 1
+            continue
+        if sys.argv[ index ] in [ "-o", "--option" ]:
+            index += 1
+            if index >= len( sys.argv ):
+                print >> sys.stderr, "Wrong arguments. Type: " + \
+                         sys.argv[0] + " --help for usage."
+                return 1
+            options = sys.argv[ index ]
             index += 1
             continue
 
@@ -147,7 +157,7 @@ def miMain():
                 print "The MI_LIBPTHREAD variable is set. " \
                       "Using its value as path to libpthread.so"
         else:
-            # The variable is not set i.e. the libpthread.so path 
+            # The variable is not set i.e. the libpthread.so path
             # must be guessed by the ldd output
             if verbose:
                 print "The MI_LIBPTHREAD is not set. Search for it in the " \
@@ -168,11 +178,22 @@ def miMain():
         if verbose:
             print "Use the user provided libpthread.so at " + libpthreadPath
 
+    # Check for the options
+    if options != "":
+        if not options in [ "stack" ]:
+            print >> sys.stderr, "Unsupported option '" + options + "'. " \
+                     " Type: " + sys.argv[0] + " --help for usage."
+            return 2
+
 
     # Form the executable command line
     cmdLine = 'LD_PRELOAD="' + libmiPath + '" '
     cmdLine += 'MI_LIBPTHREAD="' + libpthreadPath + '" '
     cmdLine += 'MI_LOGFILE="' + logFilePath + '" '
+
+    if options != "":
+        cmdLine += 'MI_OPTIONS="' + options + '" '
+
     if ' ' in elfPath:
         cmdLine += '"' + elfPath + '" '
     else:
