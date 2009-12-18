@@ -59,7 +59,13 @@ class Op:
         self.backtrace.append( line )
 
     def __str__( self ):
-        retVal = "Operation: " + self.operation + " Object: " + self.object
+        return self.getPrepended( "" )
+
+    def getPrepended( self, prefix ):
+        """ adds the given prefix to each line of the string representation """
+
+        retVal = prefix + "Operation: " + self.operation + \
+                          " Object: " + self.object
         if self.shortObj != "":
             retVal += "(" + self.shortObj + ")"
 
@@ -71,7 +77,10 @@ class Op:
         if len( self.backtrace ) == 0:
             return retVal
 
-        return retVal + "\nBacktrace:\n    " + "\n    ".join( self.backtrace )
+        return retVal + "\n" + prefix + "Backtrace:\n" + \
+                               prefix + "    " + str("\n" + \
+                               prefix + "    ").join( self.backtrace )
+
 
     def __repr__( self ):
         return self.__str__()
@@ -193,13 +202,13 @@ def statmiMain():
     if len( mostConsumingOps.operations ) > 0:
         print "The most time consuming operations:"
         for item in mostConsumingOps.operations:
-            print item
+            print item.getPrepended( "    " )
 
 
     if verbose:
         print "Collected operations:"
         for item in operations:
-            print item
+            print item.getPrepended( "    " )
 
     chains = {}                 # tZZZ -> [ [opx, opy, opz], [opx, opz], ... ]
 
@@ -215,15 +224,33 @@ def statmiMain():
         print "The program has not locked any mutexes. No analysis required."
         return 0
 
+    if len( threadLegend ) == 1:
+        print "The program has exactly one thread. " \
+              "No further analysis required."
+        return 0
+
     print "Threads legend:"
+    legend = []
     for key in threadLegend.keys():
-        print threadLegend[ key ] + " -> " + key
+        legend.append( threadLegend[ key ] + " -> " + key )
+    legend = sorted( legend, compareLegendName )
+    for item in legend:
+        print "    " + item
+
     print "Mutexes legend:"
+    legend = []
     for key in mutexLegend.keys():
-        print mutexLegend[ key ] + " -> " + key
+        legend.append( mutexLegend[ key ] + " -> " + key )
+    legend = sorted( legend, compareLegendName )
+    for item in legend:
+        print "    " + item
 
     analyse( chains, verbose )
     return 0
+
+def compareLegendName( left, right ):
+    """ compares legend names with stripped prefix """
+    return cmp( int( left[ 1: ].split()[0] ), int( right[ 1: ].split()[0] ) )
 
 
 def collectChains( operations, chains, threadLegend, ignoreUnknown ):
@@ -288,16 +315,18 @@ def printUnlockingNonLockedError( unlockOperation, lockChain ):
 
     global  errorsCount
 
-    errorsCount += 1
-    print >> sys.stderr, "----------------------------\n" \
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount ) + "\n" \
              "ERROR: Unlocking mutex which is not previously locked.\n" + \
              str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
     if len( lockChain ) == 0:
         print >> sys.stderr, "None"
     else:
         for operation in lockChain:
-            print >> sys.stderr, operation
-    print >> sys.stderr, "----------------------------"
+            print >> sys.stderr, operation.getPrepended( "    " )
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount )
+    errorsCount += 1
+    if errorsCount >= 1000:
+        raise Exception( "Too many errors" )
     return
 
 
@@ -306,13 +335,15 @@ def printUnlockingOrderWarning( unlockOperation, lockChain ):
 
     global warningsCount
 
-    warningsCount += 1
-    print >> sys.stderr, "----------------------------\n" \
+    print >> sys.stderr, "--- W" + errorNumber( warningsCount ) + "\n" \
              "WARNING: Unlocking not the last locked mutex in the thread\n" + \
              str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
     for operation in lockChain:
-        print >> sys.stderr, operation
-    print >> sys.stderr, "----------------------------"
+        print >> sys.stderr, operation.getPrepended( "    " )
+    print >> sys.stderr, "--- W" + errorNumber( warningsCount )
+    warningsCount += 1
+    if warningsCount >= 1000:
+        raise Exception( "Too many warnings" )
     return
 
 
@@ -321,12 +352,14 @@ def printLeftUnlockedError( chain ):
 
     global errorsCount
 
-    errorsCount += 1
-    print >> sys.stderr, "----------------------------\n" \
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount ) + "\n" \
              "ERROR: Some mutex[es] left locked in the thread:"
     for operation in chain:
-        print >> sys.stderr, operation
-    print >> sys.stderr, "----------------------------"
+        print >> sys.stderr, operation.getPrepended( "    " )
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount )
+    errorsCount += 1
+    if errorsCount >= 1000:
+        raise Exception( "Too many errors" )
     return
 
 
@@ -440,24 +473,34 @@ def printWrongLockOrderError( firstChain, secondChain,
         mutexes in opposite order """
 
     global errorsCount
-    errorsCount += 1
 
     firstThread = firstChain[0].shortThread
     secondThread = secondChain[0].shortThread
 
-    print >> sys.stderr, "----------------------------\n" \
+    firstWrongOrder = firstPair[0].shortObj + " -> " + firstPair[1].shortObj
+    secondWrongOrder = secondPair[0].shortObj + " -> " + secondPair[1].shortObj
+
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount ) + " -- " + \
+                         firstThread + ": " + firstWrongOrder + " -- " + \
+                         secondThread + ": " + secondWrongOrder + "\n" \
              "ERROR: potential dead lock detected\n" \
              "Thread " + firstThread + " lock stack:"
     for operation in firstChain:
-        print >> sys.stderr, operation
+        print >> sys.stderr, operation.getPrepended( "    " )
     print >> sys.stderr, "Thread " + secondThread + " lock stack:"
     for operation in secondChain:
-        print >> sys.stderr, operation
-    print >> sys.stderr, "Thread " + firstThread + " detected pair:\n" + \
-             str(firstPair[0]) + "\n" + str(firstPair[1]) + "\n" + \
+        print >> sys.stderr, operation.getPrepended( "    " )
+    print >> sys.stderr, \
+             "Thread " + firstThread + " detected pair:\n" + \
+             firstPair[0].getPrepended( "    " ) + "\n" + \
+             firstPair[1].getPrepended( "    " ) + "\n" + \
              "Thread " + secondThread + " detected pair:\n" + \
-             str(secondPair[0]) + "\n" + str(secondPair[1]) + "\n" + \
-             "----------------------------"
+             secondPair[0].getPrepended( "    " ) + "\n" + \
+             secondPair[1].getPrepended( "    " ) + "\n" + \
+             "--- E" + errorNumber( errorsCount )
+    errorsCount += 1
+    if errorsCount >= 1000:
+        raise Exception( "Too many errors" )
     return
 
 
@@ -534,6 +577,13 @@ def parseLogFile( logFileName,
     f.close()
     return
 
+
+def errorNumber( val ):
+    """ Returns the error number as 3 or more digits number """
+    val = str(val)
+    while len( val ) < 3:
+        val = "0" + val
+    return val
 
 
 # The script execution entry point
