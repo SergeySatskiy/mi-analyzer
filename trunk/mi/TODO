@@ -23,4 +23,7 @@ DONE - statmi return code: non-zero if there are warnings or mistakes
 DONE - Make sure that the error output goes into stderr
 - condition variables (are the mutexes intercepted as well?)
 - make sure that the traceback is printed in the same order as mutex lock stack
+- collected chains printout does not look properly in case of backtrace and -v
+DONE - add limit to the number of errors
+DONE - threads and mutexes legend is not alphabetically sorted
 
