@@ -140,10 +140,6 @@ def statmiMain():
     parser.add_option( "-v", "--verbose",
                        action="store_true", dest="verbose", default=False,
                        help="be verbose (default: False)" )
-    parser.add_option( "-f", "--print-failed",
-                       action="store_true", dest="printFailed", default=False,
-                       help="print available information about failed " \
-                            "operations (default: False)" )
     parser.add_option( "-u", "--ignore-unknown",
                        action="store_true", dest="ignoreUnknown",
                        default=False,
@@ -160,7 +156,6 @@ def statmiMain():
         return 3
 
     verbose = options.verbose
-    printFailed = options.printFailed
 
     logFileName = os.environ.get( 'MI_LOGFILE', 'mi.log' )
     if len( args ) == 1:
@@ -195,9 +190,10 @@ def statmiMain():
     print "Successfull operations: " + str( len(operations) )
     print "Failed operations: " + str( len(failedOperations) )
 
-    if printFailed and len(failedOperations) > 0:
+    if len(failedOperations) > 0:
+        print "Failed operations:"
         for item in failedOperations:
-            print "Failed: " + item
+            print item.getPrepended( "    " )
 
     if len( mostConsumingOps.operations ) > 0:
         print "The most time consuming operations:"
@@ -321,8 +317,9 @@ def printUnlockingNonLockedError( unlockOperation, lockChain ):
     if len( lockChain ) == 0:
         print >> sys.stderr, "None"
     else:
-        for operation in lockChain:
-            print >> sys.stderr, operation.getPrepended( "    " )
+        # Print in reverse order
+        for index in range( len(lockChain) - 1, -1, -1 ):
+            print >> sys.stderr, lockChain[index].getPrepended( "    " )
     print >> sys.stderr, "--- E" + errorNumber( errorsCount )
     errorsCount += 1
     if errorsCount >= 1000:
@@ -338,8 +335,9 @@ def printUnlockingOrderWarning( unlockOperation, lockChain ):
     print >> sys.stderr, "--- W" + errorNumber( warningsCount ) + "\n" \
              "WARNING: Unlocking not the last locked mutex in the thread\n" + \
              str(unlockOperation) + "\nCurrently locked mutexes in the thread:"
-    for operation in lockChain:
-        print >> sys.stderr, operation.getPrepended( "    " )
+    # Print in reverse order
+    for index in range( len(lockChain) - 1, -1, -1 ):
+        print >> sys.stderr, lockChain[index].getPrepended( "    " )
     print >> sys.stderr, "--- W" + errorNumber( warningsCount )
     warningsCount += 1
     if warningsCount >= 1000:
@@ -354,8 +352,9 @@ def printLeftUnlockedError( chain ):
 
     print >> sys.stderr, "--- E" + errorNumber( errorsCount ) + "\n" \
              "ERROR: Some mutex[es] left locked in the thread:"
-    for operation in chain:
-        print >> sys.stderr, operation.getPrepended( "    " )
+    # Print in reverse order
+    for index in range( len(chain) - 1, -1, -1 ):
+        print >> sys.stderr, chain[index].getPrepended( "    " )
     print >> sys.stderr, "--- E" + errorNumber( errorsCount )
     errorsCount += 1
     if errorsCount >= 1000:
@@ -485,11 +484,15 @@ def printWrongLockOrderError( firstChain, secondChain,
                          secondThread + ": " + secondWrongOrder + "\n" \
              "ERROR: potential dead lock detected\n" \
              "Thread " + firstThread + " lock stack:"
-    for operation in firstChain:
-        print >> sys.stderr, operation.getPrepended( "    " )
+
+    # Print it in a reverse order
+    for index in range( len(firstChain) - 1, -1, -1 ):
+        print >> sys.stderr, firstChain[index].getPrepended( "    " )
+
     print >> sys.stderr, "Thread " + secondThread + " lock stack:"
-    for operation in secondChain:
-        print >> sys.stderr, operation.getPrepended( "    " )
+    # Print it in a reverse order
+    for index in range( len(secondChain) - 1, -1, -1 ):
+        print >> sys.stderr, secondChain[index].getPrepended( "    " )
     print >> sys.stderr, \
              "Thread " + firstThread + " detected pair:\n" + \
              firstPair[0].getPrepended( "    " ) + "\n" + \
