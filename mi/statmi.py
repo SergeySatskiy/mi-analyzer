@@ -212,9 +212,7 @@ def statmiMain():
     collectChains( operations, chains, threadLegend,
                    options.ignoreUnknown )
 
-    if verbose:
-        print "Collected chains:"
-        print chains
+    printCollectedChains( chains, verbose )
 
     if len( operations ) == 0:
         print "The program has not locked any mutexes. No analysis required."
@@ -243,6 +241,32 @@ def statmiMain():
 
     analyse( chains, verbose )
     return 0
+
+
+def printCollectedChains( chains, verbose ):
+
+    if not verbose:
+        return
+
+    threadShortNames = chains.keys()
+    threadShortNames = sorted( threadShortNames, compareLegendName )
+
+    print "Collected chains:"
+    if len( threadShortNames ) == 0:
+        print "    none"
+        return
+
+    for threadShortName in threadShortNames:
+        print "    Thread " + threadShortName + ":"
+        threadChains = chains[ threadShortName ]
+
+        for index in range( 0, len( threadChains ) ):
+            print "        Chain #" + str(index) + " for thread " + threadShortName
+            for operation in threadChains[index]:
+                print operation.getPrepended( "            " )
+
+    return
+
 
 def compareLegendName( left, right ):
     """ compares legend names with stripped prefix """
