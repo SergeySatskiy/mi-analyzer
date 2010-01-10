@@ -1,1 +1,9 @@
-Run make in the upper directory
+The directory holds some tests for mi:
+- OK in elf (test-ok-elf.cpp)
+- OK in so (test-lib-fun-ok.cpp and test-ok-lib.cpp)
+- left locked in elf (test-bad-left-locked-elf.cpp)
+- unlocking not locked in elf (test-bad-unlocking-not-locked-elf.cpp)
+- improper unlocking order in elf (test-bad-unlock-order-elf.cpp)
+- improper locking order in elf (test-bad-lock-order-elf.cpp)
+- improper locking order in so (test-lib-fun-bad.cpp and test-bad-lib.cpp)
+ 

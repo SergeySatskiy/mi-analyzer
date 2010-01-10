@@ -1,5 +1,5 @@
 //
-// File:   test-lib-fun-ok.cpp
+// File:   test-lib-fun-bad.cpp
 //
 // Author: Sergey Satskiy, copyright (c) 2009
 //
@@ -36,12 +36,12 @@ void *  thread0( void * )
 void *  thread1( void * )
 {
     usleep( 500 );
-    pthread_mutex_lock( &m1 );
-    pthread_mutex_lock( &m2 );
     pthread_mutex_lock( &m3 );
-    pthread_mutex_unlock( &m3 );
-    pthread_mutex_unlock( &m2 );
+    pthread_mutex_lock( &m2 );
+    pthread_mutex_lock( &m1 );
     pthread_mutex_unlock( &m1 );
+    pthread_mutex_unlock( &m2 );
+    pthread_mutex_unlock( &m3 );
 
     return 0;
 }
