@@ -434,7 +434,8 @@ def getMutexIndexInChain( operation, chain ):
     """ Searches for the locked mutex in the given chain.
         Returns: -1 if not found """
 
-    for index in range( 0, len( chain ) ):
+    # search in the reverse order
+    for index in range( len( chain ) - 1, -1, -1 ):
         if operation.shortObj == chain[ index ].shortObj:
             return index
     return -1
