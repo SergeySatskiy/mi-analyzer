@@ -518,14 +518,17 @@ def printWrongLockOrderError( firstChain, secondChain,
     # Print it in a reverse order
     for index in range( len(secondChain) - 1, -1, -1 ):
         print >> sys.stderr, secondChain[index].getPrepended( "    " )
-    print >> sys.stderr, \
-             "Thread " + firstThread + " detected pair:\n" + \
-             firstPair[0].getPrepended( "    " ) + "\n" + \
-             firstPair[1].getPrepended( "    " ) + "\n" + \
-             "Thread " + secondThread + " detected pair:\n" + \
-             secondPair[0].getPrepended( "    " ) + "\n" + \
-             secondPair[1].getPrepended( "    " ) + "\n" + \
-             "--- E" + errorNumber( errorsCount )
+
+    # This is basically an excerpt from the lock stack, so let's ommit it
+    #print >> sys.stderr, \
+    #         "Thread " + firstThread + " detected pair:\n" + \
+    #         firstPair[0].getPrepended( "    " ) + "\n" + \
+    #         firstPair[1].getPrepended( "    " ) + "\n" + \
+    #         "Thread " + secondThread + " detected pair:\n" + \
+    #         secondPair[0].getPrepended( "    " ) + "\n" + \
+    #         secondPair[1].getPrepended( "    " ) + "\n"
+
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount )
     errorsCount += 1
     if errorsCount >= 1000:
         raise Exception( "Too many errors" )
