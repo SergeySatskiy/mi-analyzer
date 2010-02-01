@@ -92,6 +92,7 @@ class PthreadWrapper
             char *          libpthreadPath( getenv( "MI_LIBPTHREAD" ) );
             char *          logfilePath( getenv( "MI_LOGFILE" ) );
             char *          options( getenv( "MI_OPTIONS" ) );
+            char *          elf( getenv( "MI_ELF" ) );
             const char *    err;
 
             if ( libpthreadPath == 0 )
@@ -157,6 +158,11 @@ class PthreadWrapper
                 fprintf( stderr, "Cannot open mi.log" );
                 exit( 1 );
             }
+
+            if ( elf == 0 )
+                this->write( "Env: application: unknown\n" );
+            else
+                this->write( "Env: application: %s\n", elf );
 
             if ( logfilePath == 0 )
                 this->write( "Env: log file: %s\n", defaultLogfile );
@@ -238,8 +244,9 @@ class PthreadWrapper
             char *      funcname = (char*) malloc( funcnamesize );
 
             // iterate over the returned symbol lines. skip the first, it is the
-            // address of this function.
-            for ( int i = 1; i < addrlen; i++ )
+            // address of this function. skip the second, it is the address of
+            // the pthread_mutex_zzz(...) from libmi.so
+            for ( int i = 2; i < addrlen; i++ )
             {
                 char *  begin_name = 0;
                 char *  begin_offset = 0;
