@@ -16,6 +16,9 @@ love:
 	g++ -Wall -g -O0 -c test-bad-lib.cpp
 	g++ -g -o test-bad-lib test-bad-lib.o -L./ -ltest-lib-fun-bad
 	g++ -g -o test-failed-op test-failed-op.cpp -lpthread
+	g++ -g -o test-ok-recursive-elf test-ok-recursive-elf.cpp -lpthread
+	g++ -g -o test-ok-condition-vars-elf test-ok-condition-vars-elf.cpp -lpthread
+	g++ -g -o test-bad-lock-one-unlock-other-elf test-bad-lock-one-unlock-other-elf.cpp -lpthread
 
 clean:
 	rm -rf *.so *-elf test-ok-lib *.o test-bad-lib test-failed-op
