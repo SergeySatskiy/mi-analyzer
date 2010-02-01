@@ -296,8 +296,27 @@ def collectChains( operations, chains, threadLegend, ignoreUnknown ):
             lockedMutexIndex = getMutexIndexInChain( op,
                                    currentChains[ op.shortThread ][ 1 ] )
             if lockedMutexIndex == -1:
-                printUnlockingNonLockedError( op,
-                                              currentChains[op.shortThread][1] )
+                # Need to check if it was locked in another thread
+                ch, index = getMutexIndexInAnyChain( op, currentChains )
+                if index == -1:
+                    printUnlockingNonLockedError( op,
+                                                  currentChains[op.shortThread][1] )
+                else:
+                    # Sick! They lock mutex in one thread and unlock it in
+                    # another!
+                    otherThread = ch[0].shortThread
+
+                    printLockInOneUnlockInOtherWarning( ch, op )
+
+                    # Register the other thread chain if required
+                    if currentChains[ otherThread ][ 0 ] == True and \
+                       len( currentChains[ otherThread ][ 1 ] ) > 1:
+                        addChain( chains, currentChains[ otherThread ][ 1 ] )
+                    # Delete the operation from the other thread chain
+                    del( currentChains[ otherThread ][ 1 ][ index ] )
+
+                    # reset the other thread chain flag
+                    currentChains[ otherThread ][ 0 ] = False
                 continue
 
             if lockedMutexIndex != len(currentChains[op.shortThread][1]) - 1:
@@ -323,10 +342,35 @@ def collectChains( operations, chains, threadLegend, ignoreUnknown ):
         else:
             raise Exception( "Unknown operation " + str(op) )
 
+
     # Post analysis: there should not be still locked mutexes
     for key, value in currentChains.iteritems():
         if len( value[ 1 ] ) > 0:
             printLeftUnlockedError( value[ 1 ] )
+    return
+
+
+def printLockInOneUnlockInOtherWarning( lockChain, unlockOp ):
+    """ Prints the warning message that a mutex is locked in one thread and
+        unlocked in another """
+
+    global warningsCount
+
+    mutex = unlockOp.shortObj
+    unlockThread = unlockOp.shortThread
+    lockThread = lockChain[0].shortThread
+    print >> sys.stderr, "--- W" + errorNumber( warningsCount ) + " -- " + \
+             lockThread + ": " + mutex + ".lock, " + unlockThread + ": " + \
+             mutex + ".unlock\n" \
+             "WARNING: Unlocking a mutex which is locked in another thread\n" + \
+             str(unlockOp) + "\nCurrently locked mutexes in another thread:"
+    # Print in reverse order
+    for index in range( len(lockChain) - 1, -1, -1 ):
+        print >> sys.stderr, lockChain[index].getPrepended( "    " )
+    print >> sys.stderr, "--- W" + errorNumber( warningsCount )
+    warningsCount += 1
+    if warningsCount >= 1000:
+        raise Exception( "Too many warnings" )
     return
 
 
@@ -379,6 +423,51 @@ def printLeftUnlockedError( chain ):
     # Print in reverse order
     for index in range( len(chain) - 1, -1, -1 ):
         print >> sys.stderr, chain[index].getPrepended( "    " )
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount )
+    errorsCount += 1
+    if errorsCount >= 1000:
+        raise Exception( "Too many errors" )
+    return
+
+
+
+def printWrongLockOrderError( firstChain, secondChain,
+                              firstPair, secondPair ):
+    """ Prints error message that two threads lock
+        mutexes in opposite order """
+
+    global errorsCount
+
+    firstThread = firstChain[0].shortThread
+    secondThread = secondChain[0].shortThread
+
+    firstWrongOrder = firstPair[0].shortObj + " -> " + firstPair[1].shortObj
+    secondWrongOrder = secondPair[0].shortObj + " -> " + secondPair[1].shortObj
+
+    print >> sys.stderr, "--- E" + errorNumber( errorsCount ) + " -- " + \
+                         firstThread + ": " + firstWrongOrder + " -- " + \
+                         secondThread + ": " + secondWrongOrder + "\n" \
+             "ERROR: potential dead lock detected\n" \
+             "Thread " + firstThread + " lock stack:"
+
+    # Print it in a reverse order
+    for index in range( len(firstChain) - 1, -1, -1 ):
+        print >> sys.stderr, firstChain[index].getPrepended( "    " )
+
+    print >> sys.stderr, "Thread " + secondThread + " lock stack:"
+    # Print it in a reverse order
+    for index in range( len(secondChain) - 1, -1, -1 ):
+        print >> sys.stderr, secondChain[index].getPrepended( "    " )
+
+    # This is basically an excerpt from the lock stack, so let's ommit it
+    #print >> sys.stderr, \
+    #         "Thread " + firstThread + " detected pair:\n" + \
+    #         firstPair[0].getPrepended( "    " ) + "\n" + \
+    #         firstPair[1].getPrepended( "    " ) + "\n" + \
+    #         "Thread " + secondThread + " detected pair:\n" + \
+    #         secondPair[0].getPrepended( "    " ) + "\n" + \
+    #         secondPair[1].getPrepended( "    " ) + "\n"
+
     print >> sys.stderr, "--- E" + errorNumber( errorsCount )
     errorsCount += 1
     if errorsCount >= 1000:
@@ -441,6 +530,24 @@ def getMutexIndexInChain( operation, chain ):
     return -1
 
 
+def getMutexIndexInAnyChain( op, chains ):
+    """ It is specifically for the case if a mutex was locked in one thread and
+        is unlocked in another. I should check all other mutex chains.
+        The mutex own chain has already be checked so no need to check it. """
+
+    for key, value in chains.iteritems():
+        if key == op.shortThread:
+            continue
+        # Search for the mutex in reverse order
+        chain = chains[ key ][ 1 ]
+        for index in range( len( chain ) - 1, -1, -1 ):
+            if op.shortObj == chain[ index ].shortObj:
+                # Found a mutex locked in another thread
+                return chain, index
+
+    return None, -1
+
+
 def getMutexName( legend, mutexID ):
     """ returns an existed or a newly created short mutex name """
     if legend.has_key( mutexID ):
@@ -489,51 +596,6 @@ def buildLockPairs( chain ):
         for secondIndex in range( firstIndex + 1, len(chain) ):
             lockPairs.append( [ chain[firstIndex], chain[secondIndex] ] )
     return lockPairs
-
-
-def printWrongLockOrderError( firstChain, secondChain,
-                              firstPair, secondPair ):
-    """ Prints error message that two threads lock
-        mutexes in opposite order """
-
-    global errorsCount
-
-    firstThread = firstChain[0].shortThread
-    secondThread = secondChain[0].shortThread
-
-    firstWrongOrder = firstPair[0].shortObj + " -> " + firstPair[1].shortObj
-    secondWrongOrder = secondPair[0].shortObj + " -> " + secondPair[1].shortObj
-
-    print >> sys.stderr, "--- E" + errorNumber( errorsCount ) + " -- " + \
-                         firstThread + ": " + firstWrongOrder + " -- " + \
-                         secondThread + ": " + secondWrongOrder + "\n" \
-             "ERROR: potential dead lock detected\n" \
-             "Thread " + firstThread + " lock stack:"
-
-    # Print it in a reverse order
-    for index in range( len(firstChain) - 1, -1, -1 ):
-        print >> sys.stderr, firstChain[index].getPrepended( "    " )
-
-    print >> sys.stderr, "Thread " + secondThread + " lock stack:"
-    # Print it in a reverse order
-    for index in range( len(secondChain) - 1, -1, -1 ):
-        print >> sys.stderr, secondChain[index].getPrepended( "    " )
-
-    # This is basically an excerpt from the lock stack, so let's ommit it
-    #print >> sys.stderr, \
-    #         "Thread " + firstThread + " detected pair:\n" + \
-    #         firstPair[0].getPrepended( "    " ) + "\n" + \
-    #         firstPair[1].getPrepended( "    " ) + "\n" + \
-    #         "Thread " + secondThread + " detected pair:\n" + \
-    #         secondPair[0].getPrepended( "    " ) + "\n" + \
-    #         secondPair[1].getPrepended( "    " ) + "\n"
-
-    print >> sys.stderr, "--- E" + errorNumber( errorsCount )
-    errorsCount += 1
-    if errorsCount >= 1000:
-        raise Exception( "Too many errors" )
-    return
-
 
 
 def checkLockOrder( firstChain, secondChain ):
@@ -634,5 +696,7 @@ if __name__ == "__main__":
         else:
             print >> sys.stderr, message
             returnCode = 3
+    if returnCode == 0:
+        print "No errors, no warnings found."
     sys.exit( returnCode )
 
