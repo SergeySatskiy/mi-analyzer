@@ -11,4 +11,4 @@ The directory holds some tests for mi:
 - time consuming operations (tested on manually modified log file)
 - improper locking order in daemon (daemon-test-bad-lock-order-elf.sh)
 - condition variables (test-ok-condition-vars-elf.cpp)
-- locking in one thread and unlocking in another
+- locking in one thread and unlocking in another (test-bad-lock-one-unlock-other-elf.cpp)
