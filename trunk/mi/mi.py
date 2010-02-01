@@ -190,6 +190,7 @@ def miMain():
     cmdLine = 'LD_PRELOAD="' + libmiPath + '" '
     cmdLine += 'MI_LIBPTHREAD="' + libpthreadPath + '" '
     cmdLine += 'MI_LOGFILE="' + logFilePath + '" '
+    cmdLine += 'MI_ELF="' + elfPath + '" '
 
     if options != "":
         cmdLine += 'MI_OPTIONS="' + options + '" '
@@ -253,6 +254,7 @@ def findLibpthread( elfPath ):
             path = findLibpthread( parts[0].strip() )
             if path != "":
                 return path
+            continue
 
         if len( parts ) == 4 and parts[2] == "not" and parts[3] == "found":
             raise Exception( "One of the libraries in the program to " \
