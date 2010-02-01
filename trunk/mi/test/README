@@ -6,4 +6,9 @@ The directory holds some tests for mi:
 - improper unlocking order in elf (test-bad-unlock-order-elf.cpp)
 - improper locking order in elf (test-bad-lock-order-elf.cpp)
 - improper locking order in so (test-lib-fun-bad.cpp and test-bad-lib.cpp)
- 
+- failed operations (test-failed-op.cpp)
+- recursive mutexes OK in elf (test-ok-recursive-elf.cpp)
+- time consuming operations (tested on manually modified log file)
+- improper locking order in daemon (daemon-test-bad-lock-order-elf.sh)
+- condition variables (test-ok-condition-vars-elf.cpp)
+- locking in one thread and unlocking in another
