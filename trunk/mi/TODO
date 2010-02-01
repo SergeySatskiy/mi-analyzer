@@ -8,24 +8,36 @@ DONE - write an analysis script
 DONE - Add headers with a license
 DONE - Add README file
 DONE - Add Changelog file
-- Check indirect linking with libpthread.so
+DONE - Check indirect linking with libpthread.so i.e. script which runs an elf which
+       is linked to pthread
 - Think of better stack printing
-- Test cases: proper order in .so library
-              improper order in elf (2 mutexes)
-              improper order in elf (many mutexes)
 DONE - Add mi command line arguments to control log file name and backtrace printing
-- Test case: unlocking a not locked mutex
 DONE - statmi return code: non-zero if there are warnings or mistakes
-- Test case: left locked mutexes
-- Test case: time consuming operations
-- Test case: failed operations
-- Test case: recursive mutexes
 DONE - Make sure that the error output goes into stderr
-- condition variables (are the mutexes intercepted as well?)
 DONE - make sure that the traceback is printed in the same order as mutex lock stack
 DONE - collected chains printout does not look properly in case of backtrace and -v
        The operations must be printed in reverse order
 DONE - add limit to the number of errors
 DONE - threads and mutexes legend is not alphabetically sorted
 
-- Add to the doc that loading pthread via dlopen() will not catch the calls
+DONE - Add to the doc that loading pthread via dlopen() will not catch the calls
+DONE - Add executable name to the log file
+DONE - Is the printout good for the improper lock order? - No
+DONE - Locking in one thread and unlocking in another
+DONE - symbolic links for the app!
+
+- Test cases:
+    DONE - OK in elf (test-ok-elf.cpp)
+    DONE - OK in so (test-lib-fun-ok.cpp and test-ok-lib.cpp)
+    DONE - left locked in elf (test-bad-left-locked-elf.cpp)
+    DONE - unlocking not locked in elf (test-bad-unlocking-not-locked-elf.cpp)
+    DONE - improper unlocking order in elf (test-bad-unlock-order-elf.cpp)
+    DONE - improper locking order in elf (test-bad-lock-order-elf.cpp)
+    DONE - improper locking order in so (test-lib-fun-bad.cpp and test-bad-lib.cpp)
+    DONE - failed operations (test-failed-op.cpp)
+    DONE - time consuming operations (tested on manually modified log file)
+    DONE - recursive mutexes OK in elf (test-ok-recursive-elf.cpp)
+    DONE - improper locking order in daemon (daemon-test-bad-lock-order-elf.sh)
+    DONE - condition variables 
+    DONE - locking in one thread and unlocking in another
+
