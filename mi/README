@@ -5,17 +5,17 @@ pthread Mutex Instrumentation
 
 There are 2 steps:
 1. Run your application via the provided script:
-   ./mi yourProgram
+   ./mi.py yourProgram
    Type:
-   ./mi --help
+   ./mi.py --help
    for a usage message
    You also have an option to set the environment variables described below
    manually as well as LD_PRELOAD=<path to libmi.so> and run your
    application directly.
 2. As soon as the application finished run another script:
-   ./statmi
+   ./statmi.py
    Type:
-   ./statmi --help
+   ./statmi.py --help
    for a usage message
 
 
