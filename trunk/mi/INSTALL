@@ -5,16 +5,14 @@ Prerequisites:
   via PATH and the application given to mi must be an ELF file
 
 Building:
-- type make love
+- type: make love
 
 mi does not require any special installation. Just copy:
   libmi.so
-  mi
   mi.py
-  statmi
   statmi.py
 to the location you want to keep them. You might want to adjust the PATH
-variable correspondingly.
+variable respectively.
 
 see README for running instructions
 
