@@ -1,10 +1,10 @@
 help:
 	@echo "The following targets are supported:"
-	@echo "make love - building libmi.so"
+	@echo "make all - building libmi.so"
 	@echo "make clean - removing executables etc."
 	@echo "make test - building test examples"
 
-love:
+all:
 	g++ -shared -O2 -fPIC -Wall -o libmi.so -ldl -rdynamic mi.cpp
 
 clean:

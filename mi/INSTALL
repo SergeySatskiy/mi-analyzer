@@ -5,7 +5,7 @@ Prerequisites:
   via PATH and the application given to mi must be an ELF file
 
 Building:
-- type: make love
+- type: make all
 
 mi does not require any special installation. Just copy:
   libmi.so
