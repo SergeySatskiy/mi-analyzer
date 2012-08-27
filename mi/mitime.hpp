@@ -65,7 +65,7 @@ class PreciseTime : public timespec
         unsigned long  NanoSeconds( void ) const
         { return tv_nsec; }
 
-        operator double() () const
+        operator double () const
         {
             return (double)tv_sec + (double)tv_nsec / NSecsPerSecond;
         }
