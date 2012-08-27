@@ -30,6 +30,8 @@ using namespace std;
 
 #include <pthread.h>
 
+#include "mitime.hpp"
+
 typedef int (*mutex_function)( pthread_mutex_t * );
 
 
@@ -309,18 +311,6 @@ class PthreadWrapper
 };
 
 
-// Basically it could be that it took more than a few cycles of
-// the clock_t clocks. I however don't bother of that as soon as
-// this kind of things usually means really bad design or designed
-// on purpose
-const clock_t     maxClock( ~0x0 );
-static clock_t  clockDiff( clock_t  start, clock_t  end )
-{
-    if ( end >= start ) return end - start;
-    return (maxClock - start) + end;    // Overrun
-}
-
-
 
 static PthreadWrapper   pw;
 
@@ -335,13 +325,13 @@ extern "C"
             return pw.getLockFunction()( m );
         }
 
-        clock_t     before( clock() );
-        int         retVal( pw.getLockFunction()( m ) );
-        clock_t     after( clock() );
+        PreciseTime     before( PreciseTime::Current() );
+        int             retVal( pw.getLockFunction()( m ) );
+        PreciseTime     after( PreciseTime::Current() );
 
         pw.getLockFunction()( &outputLock );
-        pw.write( "Op: lock Object: %p Thread: %lu RetCode: %d Clocks: %lu\n",
-                  m, pthread_self(), retVal, clockDiff( before, after ) );
+        pw.write( "Op: lock Object: %p Thread: %lu RetCode: %d Clocks: %f\n",
+                  m, pthread_self(), retVal, (double)( after - before ) );
         pw.saveStack();
         pw.getUnlockFunction()( &outputLock );
 
@@ -355,13 +345,13 @@ extern "C"
             return pw.getUnlockFunction()( m );
         }
 
-        clock_t     before( clock() );
-        int         retVal( pw.getUnlockFunction()( m ) );
-        clock_t     after( clock() );
+        PreciseTime     before( PreciseTime::Current() );
+        int             retVal( pw.getUnlockFunction()( m ) );
+        PreciseTime     after( PreciseTime::Current() );
 
         pw.getLockFunction()( &outputLock );
-        pw.write( "Op: unlock Object: %p Thread: %lu RetCode: %d Clocks: %lu\n",
-                  m, pthread_self(), retVal, clockDiff( before, after ) );
+        pw.write( "Op: unlock Object: %p Thread: %lu RetCode: %d Clocks: %f\n",
+                  m, pthread_self(), retVal, (double)( after - before ) );
         pw.saveStack();
         pw.getUnlockFunction()( &outputLock );
 
@@ -375,13 +365,13 @@ extern "C"
             pw.getTrylockFunction()( m );
         }
 
-        clock_t     before( clock() );
-        int         retVal( pw.getTrylockFunction()( m ) );
-        clock_t     after( clock() );
+        PreciseTime     before( PreciseTime::Current() );
+        int             retVal( pw.getTrylockFunction()( m ) );
+        PreciseTime     after( PreciseTime::Current() );
 
         pw.getLockFunction()( &outputLock );
-        pw.write( "Op: trylock Object: %p Thread: %lu RetCode: %d Clocks: %lu\n",
-                  m, pthread_self(), retVal, clockDiff( before, after ) );
+        pw.write( "Op: trylock Object: %p Thread: %lu RetCode: %d Clocks: %f\n",
+                  m, pthread_self(), retVal, (double)( after - before ) );
         pw.saveStack();
         pw.getUnlockFunction()( &outputLock );
 
