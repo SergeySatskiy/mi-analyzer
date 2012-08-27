@@ -49,7 +49,7 @@ class Op:
         self.object      = obj
         self.thread      = th
         self.ret         = ret
-        self.clocks      = int(cl)
+        self.clocks      = float(cl)
         self.backtrace   = []
         self.shortObj    = ""
         self.shortThread = ""
@@ -105,7 +105,7 @@ class MostConsumingOperations:
     def addOperation( self, oper ):
         """ Adds a single operation to the list if required """
 
-        if oper.clocks == 0:
+        if oper.clocks == 0.0:
             return
 
         if len( self.operations ) == self.limit:
@@ -655,7 +655,7 @@ def parseLogFile( logFileName,
             op.shortThread = getThreadName( threadLegend, op.thread )
 
             # Memorise the operation time if needed
-            if op.clocks > 0:
+            if op.clocks > 0.0:
                 mostConsumingOps.addOperation( op )
 
             # Check the operation return code
